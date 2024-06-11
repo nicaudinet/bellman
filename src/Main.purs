@@ -34,25 +34,6 @@ instance Semiring Nat where
     mul Zero _ = Zero
     mul (Succ m) n = add n (mul m n)
 
-type SimpleProb a = List (Tuple a Nat)
-
--- -- Sequential Decision Problem
--- -- m = the monad
--- -- x = the state space
--- -- y = the action space
--- -- v = the reward space
--- data SDP m x y v = SPD
---     { states :: Nat -> x
---     , actions :: Nat -> x -> y
---     , next :: x -> y -> m x
---     , reward :: x -> y -> x -> v
---     , measure :: m v -> v
---     , sum :: v -> v -> v
---     }
-
-
-
-
 -- Generation problem:
 
 data State
@@ -115,12 +96,6 @@ reward _ _ BP = badValue
 reward _ _ BT = badValue
 reward _ _ GS = goodValue
 reward _ _ GU = goodValue
-
--- measure :: SimpleProb Value -> Value
--- measure probs =
---     let total = natToValue (sum (map snd probs))
---         f (Tuple a b) = a * natToValue b
---     in sum (map f probs) / total
 
 type Policy = State -> Action 
 

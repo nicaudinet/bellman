@@ -19,7 +19,9 @@ to generate this file without the comments in this block.
   , "foldable-traversable"
   , "integers"
   , "lists"
+  , "naturals"
   , "prelude"
+  , "test-unit"
   , "transformers"
   , "tuples"
   ]
