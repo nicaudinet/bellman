@@ -4,9 +4,11 @@ import Prelude
 
 import Control.Monad.Except.Trans (ExceptT, throwError, runExceptT)
 import Data.Array (replicate)
+import Data.Either (Either(..))
 import Data.Foldable (class Foldable, foldM, sum)
+import Data.Int (toNumber)
 import Data.List (List(..), fromFoldable)
-import Data.Tuple (Tuple(..), snd)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 
@@ -32,25 +34,21 @@ instance Semiring Nat where
     mul Zero _ = Zero
     mul (Succ m) n = add n (mul m n)
 
-natToInt :: Nat -> Int
-natToInt Zero = 0
-natToInt (Succ n) = 1 + natToInt n
-
 type SimpleProb a = List (Tuple a Nat)
 
--- Sequential Decision Problem
--- m = the monad
--- x = the state space
--- y = the action space
--- v = the reward space
-data SDP m x y v = SPD
-    { states :: Nat -> x
-    , actions :: Nat -> x -> y
-    , next :: x -> y -> m x
-    , reward :: x -> y -> x -> v
-    , measure :: m v -> v
-    , sum :: v -> v -> v
-    }
+-- -- Sequential Decision Problem
+-- -- m = the monad
+-- -- x = the state space
+-- -- y = the action space
+-- -- v = the reward space
+-- data SDP m x y v = SPD
+--     { states :: Nat -> x
+--     , actions :: Nat -> x -> y
+--     , next :: x -> y -> m x
+--     , reward :: x -> y -> x -> v
+--     , measure :: m v -> v
+--     , sum :: v -> v -> v
+--     }
 
 
 
@@ -81,13 +79,20 @@ instance Show Action where
     show GoGU = "GoGU"
     show GoGS = "GoGS"
 
-type Value = Int
+type Value = Number
+
+natToInt :: Nat -> Int
+natToInt Zero = 0
+natToInt (Succ n) = 1 + natToInt n
+
+natToValue :: Nat -> Value
+natToValue = natToInt >>> toNumber
 
 badValue :: Value
-badValue = -1
+badValue = toNumber (-1)
 
 goodValue :: Value
-goodValue = 1
+goodValue = toNumber 1
 
 data InvalidAction = InvalidAction State Action
 
@@ -111,11 +116,11 @@ reward _ _ BT = badValue
 reward _ _ GS = goodValue
 reward _ _ GU = goodValue
 
-measure :: SimpleProb Value -> Value
-measure probs =
-    let total = natToInt (sum (map snd probs))
-        f (Tuple a b) = a * natToInt b
-    in sum (map f probs) / total
+-- measure :: SimpleProb Value -> Value
+-- measure probs =
+--     let total = natToValue (sum (map snd probs))
+--         f (Tuple a b) = a * natToValue b
+--     in sum (map f probs) / total
 
 type Policy = State -> Action 
 
@@ -168,12 +173,32 @@ head (Last x) = x
 head (Seq (Tuple x _) _) = x
 
 sumReward :: XYSeq -> Value
-sumReward (Last _) = 0
+sumReward (Last _) = toNumber 0
 sumReward (Seq (Tuple x y) rest) = reward x y (head rest) + sumReward rest
+
+length :: forall a. List a -> Nat
+length Nil = Zero
+length (Cons _ xs) = Succ (length xs)
+
+mean :: List Value -> Value
+mean xs = sum xs / natToValue (length xs)
+
+rights :: forall a b. List (Either a b) -> List b
+rights Nil = Nil
+rights (Cons (Left _) xs) = rights xs
+rights (Cons (Right x) xs) = Cons x (rights xs)
+
+measure :: GenM Value -> Value
+measure = runExceptT >>> rights >>> mean
+
+value :: PolicySeq -> State -> Value
+value ps = trajectory ps >>> map sumReward >>> measure
 
 main :: Effect Unit
 main = do
-    let policySeq = fromFoldable (replicate 5 policy)
-    log $ show (runExceptT $ runPolicySeq GU policySeq)
-    log $ show (runExceptT $ trajectory policySeq GU)
-    log $ show (runExceptT $ map sumReward $ trajectory policySeq GU)
+    let policies = fromFoldable (replicate 5 policy)
+        init = GU
+    log $ show (runExceptT $ runPolicySeq init policies)
+    log $ show (runExceptT $ trajectory policies GU)
+    log $ show (runExceptT $ map sumReward $ trajectory policies GU)
+    log $ show (value policies GU)
