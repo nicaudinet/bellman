@@ -2,7 +2,8 @@ module Main where
 
 import Prelude
 
-import Data.Either (Either(..))
+import Control.Monad.Except.Trans (ExceptT, throwError, runExceptT)
+import Data.Array (replicate)
 import Data.Foldable (class Foldable, foldM, sum)
 import Data.List (List(..), fromFoldable)
 import Data.Tuple (Tuple(..), snd)
@@ -93,14 +94,16 @@ data InvalidAction = InvalidAction State Action
 instance Show InvalidAction where
     show (InvalidAction s a) = "Invalid action " <> show a <> " in state " <> show s
 
-next :: State -> Action -> Either InvalidAction State
-next BP GoBP = Right BP
-next BT GoGS = Right GS
-next GU GoBP = Right BP
-next GU GoBT = Right BT
-next GU GoGU = Right GU
-next GS GoGS = Right GS
-next state action = Left (InvalidAction state action)
+type GenM a = ExceptT InvalidAction List a
+
+next :: State -> Action -> GenM State
+next BP GoBP = pure BP
+next BT GoGS = pure GS
+next GU GoBP = pure BP
+next GU GoBT = pure BT
+next GU GoGU = pure GU
+next GS GoGS = pure GS
+next state action = throwError (InvalidAction state action)
 
 reward :: State -> Action -> State -> Value
 reward _ _ BP = badValue
@@ -122,7 +125,7 @@ policy GS = GoGS
 policy BT = GoGS
 policy GU = GoBT
 
-runPolicy :: State -> Policy -> Either InvalidAction State
+runPolicy :: State -> Policy -> GenM State
 runPolicy s p = next s (p s)
 
 type PolicySeq = List Policy
@@ -142,7 +145,7 @@ foldAccumM
     => (b -> a -> m b) -> b -> f a -> m (Tuple b (List b))
 foldAccumM f init = foldM (accumulateM f) (Tuple init (Cons init Nil))
 
-runPolicySeq :: State -> PolicySeq -> Either InvalidAction (Tuple State (List State))
+runPolicySeq :: State -> PolicySeq -> GenM (Tuple State (List State))
 runPolicySeq = foldAccumM runPolicy
 
 type XYPair = Tuple State Action
@@ -153,15 +156,24 @@ instance Show XYSeq where
     show (Last s) = show s
     show (Seq (Tuple s a) rest) = show s <> " -> " <> show a <> " -> " <> show rest
 
-trajectory :: PolicySeq -> State -> Either InvalidAction XYSeq
+trajectory :: PolicySeq -> State -> GenM XYSeq
 trajectory Nil s = pure (Last s)
 trajectory (Cons p ps) s = do
     let y = p s
     s' <- next s y
     map (Seq (Tuple s y)) (trajectory ps s')
 
+head :: XYSeq -> State
+head (Last x) = x
+head (Seq (Tuple x _) _) = x
+
+sumReward :: XYSeq -> Value
+sumReward (Last _) = 0
+sumReward (Seq (Tuple x y) rest) = reward x y (head rest) + sumReward rest
+
 main :: Effect Unit
 main = do
-    let policySeq = fromFoldable [policy, policy, policy]
-    log $ show (runPolicySeq GU policySeq)
-    log $ show (trajectory policySeq GU)
+    let policySeq = fromFoldable (replicate 5 policy)
+    log $ show (runExceptT $ runPolicySeq GU policySeq)
+    log $ show (runExceptT $ trajectory policySeq GU)
+    log $ show (runExceptT $ map sumReward $ trajectory policySeq GU)
