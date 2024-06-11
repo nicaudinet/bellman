@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Either (Either(..))
 import Data.Foldable (class Foldable, foldM, sum)
-import Data.List (List(..), fromFoldable, (..))
+import Data.List (List(..), fromFoldable)
 import Data.Tuple (Tuple(..), snd)
 import Effect (Effect)
 import Effect.Console (log)
@@ -145,7 +145,23 @@ foldAccumM f init = foldM (accumulateM f) (Tuple init (Cons init Nil))
 runPolicySeq :: State -> PolicySeq -> Either InvalidAction (Tuple State (List State))
 runPolicySeq = foldAccumM runPolicy
 
+type XYPair = Tuple State Action
+
+data XYSeq = Last State | Seq XYPair XYSeq
+
+instance Show XYSeq where
+    show (Last s) = show s
+    show (Seq (Tuple s a) rest) = show s <> " -> " <> show a <> " -> " <> show rest
+
+trajectory :: PolicySeq -> State -> Either InvalidAction XYSeq
+trajectory Nil s = pure (Last s)
+trajectory (Cons p ps) s = do
+    let y = p s
+    s' <- next s y
+    map (Seq (Tuple s y)) (trajectory ps s')
+
 main :: Effect Unit
-main =
+main = do
     let policySeq = fromFoldable [policy, policy, policy]
-    in log $ show (runPolicySeq GU policySeq)
+    log $ show (runPolicySeq GU policySeq)
+    log $ show (trajectory policySeq GU)
