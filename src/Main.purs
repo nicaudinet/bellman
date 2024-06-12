@@ -4,13 +4,14 @@ import Prelude
 
 import Control.Monad.Except.Trans (ExceptT, throwError, runExceptT)
 import Data.Array (replicate)
-import Data.Either (Either(..))
-import Data.Foldable (class Foldable, foldM, sum, length)
+import Data.Foldable (class Foldable, foldM)
 import Data.Int (toNumber)
 import Data.List (List(..), fromFoldable)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
+
+import SimpleProb (SP, mean, rights)
 
 -- Task: Implement backwards induction and apply it to 2-3 examples
 -- * Solver needs to be independent of the particular SDP
@@ -62,7 +63,7 @@ data InvalidAction = InvalidAction State Action
 instance Show InvalidAction where
     show (InvalidAction s a) = "Invalid action " <> show a <> " in state " <> show s
 
-type GenM a = ExceptT InvalidAction List a
+type GenM a = ExceptT InvalidAction SP a
 
 next :: State -> Action -> GenM State
 next BP GoBP = pure BP
@@ -133,14 +134,6 @@ sumReward :: XYSeq -> Value
 sumReward (Last _) = toNumber 0
 sumReward (Seq (Tuple x y) rest) = reward x y (head rest) + sumReward rest
 
-mean :: List Value -> Value
-mean xs = sum xs / length xs
-
-rights :: forall a b. List (Either a b) -> List b
-rights Nil = Nil
-rights (Cons (Left _) xs) = rights xs
-rights (Cons (Right x) xs) = Cons x (rights xs)
-
 measure :: GenM Value -> Value
 measure = runExceptT >>> rights >>> mean
 
@@ -149,9 +142,9 @@ value ps = trajectory ps >>> map sumReward >>> measure
 
 main :: Effect Unit
 main = do
-    let policies = fromFoldable (replicate 10 policy)
+    let policies = fromFoldable (replicate 5 policy)
         init = GU
-    log $ show (runExceptT $ runPolicySeq init policies)
-    log $ show (runExceptT $ trajectory policies GU)
-    log $ show (runExceptT $ map sumReward $ trajectory policies GU)
+    log $ show (rights $ runExceptT $ runPolicySeq init policies)
+    log $ show (rights $ runExceptT $ trajectory policies GU)
+    log $ show (rights $ runExceptT $ map sumReward $ trajectory policies GU)
     log $ show (value policies GU)

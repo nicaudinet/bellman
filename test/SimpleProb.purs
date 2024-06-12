@@ -8,7 +8,7 @@ import Data.Tuple (Tuple(..))
 import Test.Unit (TestSuite, suite, test)
 import Test.Unit.Assert as A
 
-import SimpleProb (SP, uniform, odds, normalize, sort)
+import SimpleProb (SP, uniform, odds, condense, sort)
 
 two :: Natural
 two = intToNat 2
@@ -30,7 +30,7 @@ testApply = test "apply" do
     A.equal (apply f dist) res
 
 testBind :: TestSuite
-testBind = test "bind" (A.equal (sort $ normalize $ bind dist f) (sort res))
+testBind = test "bind" (A.equal (sort $ condense $ bind dist f) (sort res))
     where
         f :: Boolean -> SP Boolean
         f true = uniform [true, false]

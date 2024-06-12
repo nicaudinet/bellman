@@ -2,14 +2,17 @@ module SimpleProb
     ( SP
     , uniform
     , odds
-    , normalize
+    , condense
     , sort
+    , mean
+    , rights
     ) where
 
 import Prelude
 
-import Data.Array (singleton, groupAllBy, length, zipWith, concatMap, sortWith)
+import Data.Array as A
 import Data.Array.NonEmpty (NonEmptyArray, head)
+import Data.Either (Either(..))
 import Data.Foldable (and, sum)
 import Data.Int (toNumber)
 import Data.Natural (Natural, natToInt)
@@ -28,7 +31,7 @@ prob (PI _ p) = p
 
 instance Show a => Show (PI a) where
     show :: PI a -> String
-    show (PI x p) = show x <> " : " <> show p
+    show (PI x p) = "(" <> show x <> " : " <> show p <> ")"
 
 instance (Eq a) => Eq (PI a) where
     eq :: PI a -> PI a -> Boolean
@@ -47,11 +50,11 @@ data SP a = SP (Array (PI a))
 
 instance (Show a) => Show (SP a) where
     show :: SP a -> String
-    show (SP xs) = show xs
+    show (SP xs) = "SP " <> show xs
 
 instance (Eq a) => Eq (SP a) where
     eq :: SP a -> SP a -> Boolean
-    eq (SP xs) (SP ys) = and (zipWith eq xs ys)
+    eq (SP xs) (SP ys) = and (A.zipWith eq xs ys)
 
 instance Functor SP where
     map :: forall a b. (a -> b) -> SP a -> SP b
@@ -63,11 +66,11 @@ instance Apply SP where
 
 instance Applicative SP where
     pure :: forall a. a -> SP a
-    pure x = SP (singleton (PI x 1.0))
+    pure x = SP (A.singleton (PI x 1.0))
 
 instance Bind SP where
     bind :: forall a b. SP a -> (a -> SP b) -> SP b
-    bind (SP xs) f = SP (concatMap (map f >>> scale >>> unSP) xs)
+    bind (SP xs) f = SP (A.concatMap (map f >>> scale >>> unSP) xs)
         where
           scale :: PI (SP b) -> SP b
           scale (PI sp p) = pmap (mul p) sp
@@ -80,12 +83,11 @@ unSP (SP xs) = xs
 pmap :: forall a. (Number -> Number) -> SP a -> SP a
 pmap f (SP xs) = SP (map (\(PI x p) -> PI x (f p)) xs)
 
-sort :: forall a. Ord a => SP a -> SP a
-sort = unSP >>> sortWith item >>> SP
+-- | Creating distributions
 
 uniform :: forall a. Array a -> SP a
 uniform xs =
-    let l = toNumber (length xs)
+    let l = toNumber (A.length xs)
      in SP (map (\x -> PI x (1.0 / l)) xs)
 
 odds :: forall a. Array (Tuple a Natural) -> SP a
@@ -94,10 +96,30 @@ odds xs =
         total = natToNum (sum (map snd xs))
      in SP (map (\(Tuple x n) -> PI x (natToNum n / total)) xs)
 
-normalize :: forall a. Ord a => SP a -> SP a
-normalize = unSP >>> groupAllBy cmp >>> map foldGroups >>> SP
+-- | Rearranging distribution internals
+
+condense :: forall a. Ord a => SP a -> SP a
+condense = unSP >>> A.groupAllBy cmp >>> map foldGroups >>> SP
     where
         cmp :: PI a -> PI a -> Ordering
         cmp (PI x _) (PI y _) = compare x y
         foldGroups :: NonEmptyArray (PI a) -> PI a
         foldGroups xs = PI (item (head xs)) (sum (map prob xs))
+
+sort :: forall a. Ord a => SP a -> SP a
+sort = unSP >>> A.sortWith item >>> SP
+
+-- | Functions on distributions
+
+mean :: SP Number -> Number
+mean (SP xs) = sum (map (\(PI x p) -> x * p) xs)
+
+rights :: forall a b. SP (Either a b) -> SP b
+rights (SP xs) = pmap (div total) (SP rs)
+    where
+        fn :: PI (Either a b) -> Array (PI b)
+        fn (PI (Left _) _) = mempty
+        fn (PI (Right x) p) = A.singleton (PI x p)
+
+        rs = A.foldMap fn xs
+        total = sum (map prob rs)
