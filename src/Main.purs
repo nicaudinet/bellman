@@ -3,7 +3,8 @@ module Main where
 import Prelude
 
 import Data.Array (replicate)
-import Data.Foldable (class Foldable, foldM, intercalate)
+import Data.Array.NonEmpty as NA
+import Data.Foldable (class Foldable, foldM, intercalate, maximumBy)
 import Data.Int (toNumber)
 import Data.Natural (Natural, intToNat, (+-))
 import Data.List (List(..), (:), fromFoldable)
@@ -153,18 +154,21 @@ valueBellman (Cons p ps) x =
         mx' = next x y
      in measure (map (\x' -> reward x y x' + valueBellman ps x') mx')
 
-optimalExtension :: PolicySeq -> Policy
-optimalExtension ps s =
-    if valueBellman (stay : ps) s >= valueBellman (go : ps) s
-    then stay s
-    else go s
+possiblePolicies :: NA.NonEmptyArray Policy
+possiblePolicies = (NA.singleton stay) <> (NA.singleton go)
     where
         stay :: Policy
-        stay = const Stay
+        stay _ = Stay
 
         go :: Policy
         go GU = Go
         go _ = Stay
+
+optimalExtension :: PolicySeq -> Policy
+optimalExtension ps s = (NA.last (NA.sortWith fn possiblePolicies)) s
+    where
+        fn :: Policy -> Value
+        fn p = valueBellman (p : ps) s
 
 bi :: Natural -> PolicySeq
 bi n =
