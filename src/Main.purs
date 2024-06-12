@@ -3,10 +3,10 @@ module Main where
 import Prelude
 
 import Data.Array (replicate)
-import Data.Foldable (class Foldable, foldM)
+import Data.Foldable (class Foldable, foldM, intercalate)
 import Data.Int (toNumber)
-import Data.Natural (intToNat)
-import Data.List (List(..), fromFoldable)
+import Data.Natural (Natural, intToNat, (+-))
+import Data.List (List(..), (:), fromFoldable)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
@@ -38,6 +38,13 @@ instance Show State where
     show GS = "GS"
     show GU = "GU"
 
+instance Eq State where
+    eq BP BP = true
+    eq BT BT = true
+    eq GS GS = true
+    eq GU GU = true
+    eq _ _ = false
+
 data Action
     = Stay -- Stay in current node
     | Go -- Go to other node (only applies to GU)
@@ -45,6 +52,11 @@ data Action
 instance Show Action where
     show Stay = "Stay"
     show Go = "Go"
+
+instance Eq Action where
+    eq Stay Stay = true
+    eq Go Go = true
+    eq _ _ = false
 
 type Value = Number
 
@@ -125,7 +137,7 @@ head (Last x) = x
 head (Seq (Tuple x _) _) = x
 
 sumReward :: XYSeq -> Value
-sumReward (Last _) = toNumber 0
+sumReward (Last _) = 0.0
 sumReward (Seq (Tuple x y) rest) = reward x y (head rest) + sumReward rest
 
 measure :: GenM Value -> Value
@@ -133,6 +145,38 @@ measure = mean
 
 value :: PolicySeq -> State -> Value
 value ps = trajectory ps >>> map sumReward >>> measure
+
+valueBellman :: PolicySeq -> State -> Value
+valueBellman Nil _ = 0.0
+valueBellman (Cons p ps) x =
+    let y = p x
+        mx' = next x y
+     in measure (map (\x' -> reward x y x' + valueBellman ps x') mx')
+
+optimalExtension :: PolicySeq -> Policy
+optimalExtension ps s =
+    if valueBellman (stay : ps) s >= valueBellman (go : ps) s
+    then stay s
+    else go s
+    where
+        stay :: Policy
+        stay = const Stay
+
+        go :: Policy
+        go GU = Go
+        go _ = Stay
+
+bi :: Natural -> PolicySeq
+bi n =
+    if n == zero
+    then Nil
+    else let ps = bi (n +- one) in optimalExtension ps : ps
+
+showPolicy :: Policy -> String
+showPolicy p = if p GU == Stay then "Stay" else "Go"
+
+showPolicySeq :: PolicySeq -> String
+showPolicySeq = map showPolicy >>> intercalate " -> "
 
 main :: Effect Unit
 main = do
@@ -142,3 +186,13 @@ main = do
     log $ show (trajectory policies GU)
     log $ show (map sumReward $ trajectory policies GU)
     log $ show (value policies GU)
+    log $ show (valueBellman policies GU)
+    log $ showPolicySeq (bi (intToNat 0))
+    log $ showPolicySeq (bi (intToNat 1))
+    log $ showPolicySeq (bi (intToNat 2))
+    log $ showPolicySeq (bi (intToNat 3))
+    log $ showPolicySeq (bi (intToNat 4))
+    log $ showPolicySeq (bi (intToNat 5))
+    log $ showPolicySeq (bi (intToNat 6))
+    log $ showPolicySeq (bi (intToNat 7))
+    log $ showPolicySeq (bi (intToNat 8))
