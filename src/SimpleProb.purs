@@ -1,13 +1,27 @@
-module SimpleProb where
+module SimpleProb
+    ( SP
+    , uniform
+    , odds
+    ) where
 
 import Prelude
 
-import Data.Foldable (and)
-import Data.List (List(..), (:), zipWith)
-import Data.Natural (Natural) 
+import Data.Array (singleton, length, zipWith)
+import Data.Foldable (and, sum)
+import Data.Int (toNumber)
+import Data.Natural (Natural, natToInt)
+import Data.Tuple (Tuple(..), snd)
 
 -- A probability item : an item with an associated probability
-data PI a = PI a Natural
+-- Probabilities are represented as Javascript Numbers
+-- https://developer.mozilla.org/en-US/docs/Web/JavaScript/Data_structures#number_type
+data PI a = PI a Number
+
+item :: forall a. PI a -> a
+item (PI x _) = x
+
+prob :: forall a. PI a -> Number
+prob (PI _ p) = p
 
 instance Show a => Show (PI a) where
     show :: PI a -> String
@@ -25,12 +39,8 @@ instance Apply PI where
     apply :: forall a b. PI (a -> b) -> PI a -> PI b
     apply (PI f p) (PI x q) = PI (f x) (mul p q)
 
--- instance Bind PI where
---     bind :: forall a b. PI a -> (a -> PI b) -> PI b
---     bind 
-
 -- Simple (finite) probability distributions
-data SP a = SP (List (PI a))
+data SP a = SP (Array (PI a))
 
 instance (Show a) => Show (SP a) where
     show :: SP a -> String
@@ -50,8 +60,15 @@ instance Apply SP where
 
 instance Applicative SP where
     pure :: forall a. a -> SP a
-    pure x = SP ((PI x one) : Nil)
+    pure x = SP (singleton (PI x 1.0))
 
--- instance Bind SP where 
---     bind :: forall a b. SP a -> (a -> SP b) -> SP b
---     bind (SP xs) f =
+uniform :: forall a. Array a -> SP a
+uniform xs =
+    let l = toNumber (length xs)
+     in SP (map (\x -> PI x (1.0 / l)) xs)
+
+odds :: forall a. Array (Tuple a Natural) -> SP a
+odds xs =
+    let natToNum = natToInt >>> toNumber
+        total = natToNum (sum (map snd xs))
+     in SP (map (\(Tuple x n) -> PI x (natToNum n / total)) xs)
