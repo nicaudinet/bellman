@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Except.Trans (ExceptT, throwError, runExceptT)
 import Data.Array (replicate)
 import Data.Either (Either(..))
-import Data.Foldable (class Foldable, foldM, sum)
+import Data.Foldable (class Foldable, foldM, sum, length)
 import Data.Int (toNumber)
 import Data.List (List(..), fromFoldable)
 import Data.Tuple (Tuple(..))
@@ -22,17 +22,6 @@ import Effect.Console (log)
 -- 3) Sort them by probability
 -- 4) Show the first few examples
 -- 5) Say something about the computational complexity
-
--- Peano natural numbers
-data Nat = Zero | Succ Nat
-
-instance Semiring Nat where
-    zero = Zero
-    one = Succ Zero
-    add Zero n = n
-    add (Succ m) n = Succ (add m n)
-    mul Zero _ = Zero
-    mul (Succ m) n = add n (mul m n)
 
 -- Generation problem:
 
@@ -61,13 +50,6 @@ instance Show Action where
     show GoGS = "GoGS"
 
 type Value = Number
-
-natToInt :: Nat -> Int
-natToInt Zero = 0
-natToInt (Succ n) = 1 + natToInt n
-
-natToValue :: Nat -> Value
-natToValue = natToInt >>> toNumber
 
 badValue :: Value
 badValue = toNumber (-1)
@@ -151,12 +133,8 @@ sumReward :: XYSeq -> Value
 sumReward (Last _) = toNumber 0
 sumReward (Seq (Tuple x y) rest) = reward x y (head rest) + sumReward rest
 
-length :: forall a. List a -> Nat
-length Nil = Zero
-length (Cons _ xs) = Succ (length xs)
-
 mean :: List Value -> Value
-mean xs = sum xs / natToValue (length xs)
+mean xs = sum xs / length xs
 
 rights :: forall a b. List (Either a b) -> List b
 rights Nil = Nil
@@ -171,7 +149,7 @@ value ps = trajectory ps >>> map sumReward >>> measure
 
 main :: Effect Unit
 main = do
-    let policies = fromFoldable (replicate 5 policy)
+    let policies = fromFoldable (replicate 10 policy)
         init = GU
     log $ show (runExceptT $ runPolicySeq init policies)
     log $ show (runExceptT $ trajectory policies GU)
