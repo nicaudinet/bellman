@@ -13,7 +13,7 @@ import Prelude
 import Data.Array as A
 import Data.Array.NonEmpty (NonEmptyArray, head)
 import Data.Either (Either(..))
-import Data.Foldable (and, sum)
+import Data.Foldable (and, sum, intercalate)
 import Data.Int (toNumber)
 import Data.Natural (Natural, natToInt)
 import Data.Tuple (Tuple(..), snd)
@@ -50,7 +50,7 @@ data SP a = SP (Array (PI a))
 
 instance (Show a) => Show (SP a) where
     show :: SP a -> String
-    show (SP xs) = "SP " <> show xs
+    show (SP xs) = intercalate "\n\t" ("SP" A.: map show xs)
 
 instance (Eq a) => Eq (SP a) where
     eq :: SP a -> SP a -> Boolean

@@ -2,16 +2,16 @@ module Main where
 
 import Prelude
 
-import Control.Monad.Except.Trans (ExceptT, throwError, runExceptT)
 import Data.Array (replicate)
 import Data.Foldable (class Foldable, foldM)
 import Data.Int (toNumber)
+import Data.Natural (intToNat)
 import Data.List (List(..), fromFoldable)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 
-import SimpleProb (SP, mean, rights)
+import SimpleProb (SP, odds, mean)
 
 -- Task: Implement backwards induction and apply it to 2-3 examples
 -- * Solver needs to be independent of the particular SDP
@@ -29,26 +29,22 @@ import SimpleProb (SP, mean, rights)
 data State
     = BP -- Bad Permanent
     | BT -- Bad Temporary
-    | GU -- Good Unstabl
     | GS -- Good Stable
+    | GU -- Good Unstable
 
 instance Show State where
     show BP = "BP"
     show BT = "BT"
-    show GU = "GU"
     show GS = "GS"
+    show GU = "GU"
 
 data Action
-    = GoBP
-    | GoBT
-    | GoGU
-    | GoGS
+    = Stay -- Stay in current node
+    | Go -- Go to other node (only applies to GU)
 
 instance Show Action where
-    show GoBP = "GoBP"
-    show GoBT = "GoBT"
-    show GoGU = "GoGU"
-    show GoGS = "GoGS"
+    show Stay = "Stay"
+    show Go = "Go"
 
 type Value = Number
 
@@ -63,16 +59,14 @@ data InvalidAction = InvalidAction State Action
 instance Show InvalidAction where
     show (InvalidAction s a) = "Invalid action " <> show a <> " in state " <> show s
 
-type GenM a = ExceptT InvalidAction SP a
+type GenM a = SP a
 
 next :: State -> Action -> GenM State
-next BP GoBP = pure BP
-next BT GoGS = pure GS
-next GU GoBP = pure BP
-next GU GoBT = pure BT
-next GU GoGU = pure GU
-next GS GoGS = pure GS
-next state action = throwError (InvalidAction state action)
+next BP _ = pure BP
+next BT _ = pure GS
+next GS _ = pure GS
+next GU Stay = odds [(Tuple GU (intToNat 4)), (Tuple BP one)]
+next GU Go = pure BT
 
 reward :: State -> Action -> State -> Value
 reward _ _ BP = badValue
@@ -83,10 +77,10 @@ reward _ _ GU = goodValue
 type Policy = State -> Action 
 
 policy :: Policy
-policy BP = GoBP
-policy GS = GoGS
-policy BT = GoGS
-policy GU = GoBT
+policy BP = Stay
+policy BT = Stay
+policy GS = Stay
+policy GU = Stay
 
 runPolicy :: State -> Policy -> GenM State
 runPolicy s p = next s (p s)
@@ -135,7 +129,7 @@ sumReward (Last _) = toNumber 0
 sumReward (Seq (Tuple x y) rest) = reward x y (head rest) + sumReward rest
 
 measure :: GenM Value -> Value
-measure = runExceptT >>> rights >>> mean
+measure = mean
 
 value :: PolicySeq -> State -> Value
 value ps = trajectory ps >>> map sumReward >>> measure
@@ -144,7 +138,7 @@ main :: Effect Unit
 main = do
     let policies = fromFoldable (replicate 5 policy)
         init = GU
-    log $ show (rights $ runExceptT $ runPolicySeq init policies)
-    log $ show (rights $ runExceptT $ trajectory policies GU)
-    log $ show (rights $ runExceptT $ map sumReward $ trajectory policies GU)
+    log $ show (runPolicySeq init policies)
+    log $ show (trajectory policies GU)
+    log $ show (map sumReward $ trajectory policies GU)
     log $ show (value policies GU)

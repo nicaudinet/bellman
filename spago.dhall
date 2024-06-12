@@ -22,7 +22,6 @@ to generate this file without the comments in this block.
   , "naturals"
   , "prelude"
   , "test-unit"
-  , "transformers"
   , "tuples"
   ]
 , packages = ./packages.dhall
