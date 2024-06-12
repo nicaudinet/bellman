@@ -2,11 +2,14 @@ module SimpleProb
     ( SP
     , uniform
     , odds
+    , normalize
+    , sort
     ) where
 
 import Prelude
 
-import Data.Array (singleton, length, zipWith)
+import Data.Array (singleton, groupAllBy, length, zipWith, concatMap, sortWith)
+import Data.Array.NonEmpty (NonEmptyArray, head)
 import Data.Foldable (and, sum)
 import Data.Int (toNumber)
 import Data.Natural (Natural, natToInt)
@@ -62,6 +65,24 @@ instance Applicative SP where
     pure :: forall a. a -> SP a
     pure x = SP (singleton (PI x 1.0))
 
+instance Bind SP where
+    bind :: forall a b. SP a -> (a -> SP b) -> SP b
+    bind (SP xs) f = SP (concatMap (map f >>> scale >>> unSP) xs)
+        where
+          scale :: PI (SP b) -> SP b
+          scale (PI sp p) = pmap (mul p) sp
+
+instance Monad SP
+
+unSP :: forall a. SP a -> Array (PI a)
+unSP (SP xs) = xs
+
+pmap :: forall a. (Number -> Number) -> SP a -> SP a
+pmap f (SP xs) = SP (map (\(PI x p) -> PI x (f p)) xs)
+
+sort :: forall a. Ord a => SP a -> SP a
+sort = unSP >>> sortWith item >>> SP
+
 uniform :: forall a. Array a -> SP a
 uniform xs =
     let l = toNumber (length xs)
@@ -72,3 +93,11 @@ odds xs =
     let natToNum = natToInt >>> toNumber
         total = natToNum (sum (map snd xs))
      in SP (map (\(Tuple x n) -> PI x (natToNum n / total)) xs)
+
+normalize :: forall a. Ord a => SP a -> SP a
+normalize = unSP >>> groupAllBy cmp >>> map foldGroups >>> SP
+    where
+        cmp :: PI a -> PI a -> Ordering
+        cmp (PI x _) (PI y _) = compare x y
+        foldGroups :: NonEmptyArray (PI a) -> PI a
+        foldGroups xs = PI (item (head xs)) (sum (map prob xs))

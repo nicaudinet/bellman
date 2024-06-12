@@ -2,13 +2,19 @@ module Test.SimpleProb (tests) where
 
 import Prelude
 
-import Data.Natural (intToNat)
+import Data.Natural (Natural, intToNat)
 import Data.Tuple (Tuple(..))
 
 import Test.Unit (TestSuite, suite, test)
-import Test.Unit.Assert as A 
+import Test.Unit.Assert as A
 
-import SimpleProb (uniform, odds)
+import SimpleProb (SP, uniform, odds, normalize, sort)
+
+two :: Natural
+two = intToNat 2
+
+three :: Natural
+three = intToNat 3
 
 testFunctor :: TestSuite
 testFunctor = test "functor" do
@@ -18,15 +24,27 @@ testFunctor = test "functor" do
 
 testApply :: TestSuite
 testApply = test "apply" do
-    let one = intToNat 1
-        two = intToNat 2
-        f = uniform [(add 1), (add 2)]
+    let f = uniform [(add 1), (add 2)]
         dist = odds [(Tuple 1 one), (Tuple 10 two)]
         res = odds [(Tuple 2 one), (Tuple 11 two), (Tuple 3 one), (Tuple 12 two)]
     A.equal (apply f dist) res
+
+testBind :: TestSuite
+testBind = test "bind" (A.equal (sort $ normalize $ bind dist f) (sort res))
+    where
+        f :: Boolean -> SP Boolean
+        f true = uniform [true, false]
+        f false = odds [(Tuple true one), (Tuple false zero)]
+
+        dist :: SP Boolean
+        dist = uniform [true, false]
+
+        res :: SP Boolean
+        res = odds [(Tuple true three), (Tuple false one)]
 
 tests :: TestSuite
 tests =
     suite "SimpleProb" do
         testFunctor
         testApply
+        testBind
