@@ -4,8 +4,8 @@ module SimpleProb
     , odds
     , condense
     , sort
+    , psort
     , mean
-    , rights
     ) where
 
 import Prelude
@@ -109,17 +109,10 @@ condense = unSP >>> A.groupAllBy cmp >>> map foldGroups >>> SP
 sort :: forall a. Ord a => SP a -> SP a
 sort = unSP >>> A.sortWith item >>> SP
 
+psort :: forall a. SP a -> SP a
+psort = unSP >>> A.sortWith prob >>> A.reverse >>> SP
+
 -- | Functions on distributions
 
 mean :: SP Number -> Number
 mean (SP xs) = sum (map (\(PI x p) -> x * p) xs)
-
-rights :: forall a b. SP (Either a b) -> SP b
-rights (SP xs) = pmap (div total) (SP rs)
-    where
-        fn :: PI (Either a b) -> Array (PI b)
-        fn (PI (Left _) _) = mempty
-        fn (PI (Right x) p) = A.singleton (PI x p)
-
-        rs = A.foldMap fn xs
-        total = sum (map prob rs)

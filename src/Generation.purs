@@ -9,6 +9,8 @@ module Generation
     , measure
     , possiblePolicies
     , showPolicy
+    , initState
+    , sort
     )
     where
 
@@ -19,7 +21,7 @@ import Data.Int (toNumber)
 import Data.Natural (intToNat)
 import Data.Tuple (Tuple(..))
 
-import SimpleProb (SP, odds, mean)
+import SimpleProb (SP, odds, mean, psort)
 
 -- Generation problem:
 
@@ -83,7 +85,7 @@ next :: State -> Action -> GenM State
 next BP _ = pure BP
 next BT _ = pure GS
 next GS _ = pure GS
-next GU Stay = odds [(Tuple GU (intToNat 4)), (Tuple BP one)]
+next GU Stay = odds [(Tuple GU (intToNat 9)), (Tuple BP one)]
 next GU Go = pure BT
 
 reward :: State -> Action -> State -> Value
@@ -97,3 +99,9 @@ measure = mean
 
 showPolicy :: (State -> Action) -> String
 showPolicy p = if p GU == Stay then "Stay" else "Go"
+
+initState :: State
+initState = GU
+
+sort :: forall a. GenM a -> GenM a
+sort = psort

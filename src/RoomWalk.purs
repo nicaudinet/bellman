@@ -9,6 +9,8 @@ module RoomWalk
     , measure
     , possiblePolicies
     , showPolicy
+    , initState
+    , sort
     )
     where
 
@@ -21,7 +23,7 @@ import Data.Maybe (fromMaybe)
 import Data.Natural (intToNat)
 import Data.Tuple (Tuple(..))
 
-import SimpleProb (SP, mean, odds)
+import SimpleProb (SP, mean, odds, psort)
 
 -- Random Walk problem:
 
@@ -143,3 +145,9 @@ showPolicy p = intercalate "\n"
     , "| " <> show (p C11) <> " | " <> show (p C21) <> " | " <> show (p C31) <> " |"
     , "-------------"
     ]
+
+initState :: State
+initState = C11
+
+sort :: forall a. GenM a -> GenM a
+sort = psort

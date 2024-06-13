@@ -4,14 +4,14 @@ import Prelude
 
 import Data.Array.NonEmpty as NA
 import Data.Foldable (intercalate)
-import Data.List (List(..), (:), range)
+import Data.List (List(..), (:))
 import Data.Natural (Natural, intToNat, (+-))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 
--- import Generation (GenM, State, Action, Value, zeroValue, next, reward, measure, possiblePolicies, showPolicy)
-import RoomWalk (GenM, State, Action, Value, zeroValue, next, reward, measure, possiblePolicies, showPolicy)
+-- import Generation (GenM, State, Action, Value, zeroValue, next, reward, measure, possiblePolicies, showPolicy, initState, sort)
+import RoomWalk (GenM, State, Action, Value, zeroValue, next, reward, measure, possiblePolicies, showPolicy, initState, sort)
 
 -- Task: Implement backwards induction and apply it to 2-3 examples
 -- * Solver needs to be independent of the particular SDP
@@ -81,4 +81,8 @@ forM_ Nil _ = pure unit
 forM_ (Cons x xs) f = f x >>= \_ -> forM_ xs f
 
 main :: Effect Unit
-main = forM_ (range 0 2) (intToNat >>> bi >>> showPolicySeq >>> log)
+main = do
+    let policySeq = bi (intToNat 1)
+    log (showPolicySeq policySeq)
+    let ts = trajectory policySeq initState
+    log (show (sort ts))
