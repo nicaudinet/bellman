@@ -2,20 +2,16 @@ module Main where
 
 import Prelude
 
-import Data.Array (range)
 import Data.Array.NonEmpty as NA
-import Data.Foldable (for_, intercalate)
+import Data.Foldable (intercalate)
+import Data.List (List(..), (:), range)
 import Data.Natural (Natural, intToNat, (+-))
-import Data.List (List(..), (:))
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Console (log)
 
-import Generation
-    ( GenM, State, Action, Value
-    , zeroValue, next, reward, measure
-    , possiblePolicies, showPolicy
-    )
+-- import Generation (GenM, State, Action, Value, zeroValue, next, reward, measure, possiblePolicies, showPolicy)
+import RoomWalk (GenM, State, Action, Value, zeroValue, next, reward, measure, possiblePolicies, showPolicy)
 
 -- Task: Implement backwards induction and apply it to 2-3 examples
 -- * Solver needs to be independent of the particular SDP
@@ -55,7 +51,6 @@ sumReward :: XYSeq -> Value
 sumReward (Last _) = zeroValue
 sumReward (Seq (Tuple x y) rest) = reward x y (head rest) + sumReward rest
 
-
 value :: PolicySeq -> State -> Value
 value ps = trajectory ps >>> map sumReward >>> measure
 
@@ -81,5 +76,9 @@ bi n =
 showPolicySeq :: PolicySeq -> String
 showPolicySeq = map showPolicy >>> intercalate " -> "
 
+forM_ :: forall m a b. Monad m => List a -> (a -> m b) -> m Unit
+forM_ Nil _ = pure unit 
+forM_ (Cons x xs) f = f x >>= \_ -> forM_ xs f
+
 main :: Effect Unit
-main = for_ (range 0 8) (intToNat >>> bi >>> showPolicySeq >>> log)
+main = forM_ (range 0 2) (intToNat >>> bi >>> showPolicySeq >>> log)
